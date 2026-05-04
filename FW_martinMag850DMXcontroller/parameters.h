@@ -4,6 +4,7 @@
 
 //Parameters for handling buttons pushes behaviours
 #define LONGPRESSTIMER		        2000    //Time in ms for considering button long pressed
+#define TIMEOUT_MENU		          10000    //Time in ms for considering button long pressed
 
 #define REPEAT_START_DELAY        500     // ms before auto-repeat
 #define REPEAT_INITIAL_INTERVAL   200     // speed at sart au début
