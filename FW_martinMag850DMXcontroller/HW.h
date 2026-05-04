@@ -2,6 +2,7 @@
 #ifndef HW_h
 #define HW_h
 
+#define HW_VERSION      11
 
 // Define PWM pins
 #define PWM_OUT         13
@@ -10,6 +11,9 @@
 #define DMX_TX_PIN      16
 #define DMX_RX_PIN      17
 #define DMX_EN_PIN      26
+
+//FAN relay output
+#define FAN_RELAY_PIN   25
 
 //I2C Display pins
 #define I2C_SDA 	      21
@@ -28,18 +32,18 @@
 
 //Switch panel
 
-#define SW_MINUS        33
-#define SW_ENTER        25
-#define SW_PLUS         32
+#define SW_ENTER        35 //SW1
+#define SW_MINUS        33 //SW2
+#define SW_PLUS         32 //SW3
 
 //FOGGER STATUS INPUT
-#define FOGGER_HEATING  14
-#define FOGGER_READY    27
+#define FOGGER_HEATING  27
+#define FOGGER_READY    14
 
 //PWM calibration
 
-#define VOUT_IDLE       27 //1,5Vout 
-#define VOUT_START      40 //2Vout
+#define VOUT_IDLE       37 //1,5Vout 
+#define VOUT_START      48 //2Vout
 #define VOUT_END        243 //10Vout
 #define PWM_FREQ        2000 //PWM frequency, set accordingly the RC filter
 

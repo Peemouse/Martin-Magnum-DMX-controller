@@ -4,7 +4,7 @@
 //Github : https://github.com/Peemouse/Martin-Magnum-DMX-controller
 
 #define FW_MAJOR      0
-#define FW_MINOR      1
+#define FW_MINOR      2
 
 #define DEBUG
 //#define ETHERNET
@@ -58,7 +58,9 @@ bool foggerHeating = false, foggerReady = false;
 bool PWMactivated = true;
 bool PWMactivatedMemo = false;
 
-bool pleaseUpdateEEPROM = false;
+bool forceFullFog = false;
+bool isCoolingDown = false;
+bool fanRelay = false;
 
 //display variables
 bool flag1s = true;
@@ -75,6 +77,7 @@ unsigned long btnPlusTimer = 0;
 unsigned long btnMinusTimer = 0;
 unsigned long fogOnTimer = 0;
 unsigned long fogOffTimer = 0;
+unsigned long inMenuTimer = 0;
 
 // Auto repeat management
 unsigned long btnPlusPressTime = 0;
@@ -100,10 +103,11 @@ void setup() {
   Serial.begin(115200);
 
   pinMode(SW_MINUS, INPUT_PULLUP);
-  pinMode(SW_ENTER, INPUT_PULLUP);
+  pinMode(SW_ENTER,INPUT); //HW pullup because it uses GPIO35 (no internal pullup or pulldown)
   pinMode(SW_PLUS, INPUT_PULLUP);
   pinMode(FOGGER_HEATING, INPUT_PULLUP);
   pinMode(FOGGER_READY, INPUT_PULLUP);
+  pinMode(FAN_RELAY_PIN, OUTPUT);
 
   ledcAttach(PWM_OUT, PWM_FREQ, 8);
   ledcWrite(PWM_OUT, 0);
@@ -112,8 +116,8 @@ void setup() {
 
   //Retrieve parameters from memory
   preferences.begin("params", false);
-  DMXstartAddress = preferences.getUInt("dmxStartAddr", 0);
-  if (DMXstartAddress > 510){
+  DMXstartAddress = preferences.getUInt("dmxStartAddr", 1);
+  if (DMXstartAddress >509){
     DMXstartAddress = 1;
     preferences.putUInt("dmxStartAddr", DMXstartAddress);
   }
@@ -232,7 +236,8 @@ void TaskDMXwired(void *pvParameters){ // Take care of DMX IN packets
 
       if (!packet.err) {
         if (!dmxIsConnected) {
-          Serial.println("DMX is connected!");
+          Serial.print("DMX is connected! Listening to channels starting at ");
+          Serial.println(DMXstartAddress);
           dmxIsConnected = true;
         }
         dmx_read(dmxPort, DMXdata, packet.size);
@@ -290,6 +295,10 @@ void TaskPWM(void *pvParameters){ // Take care of DMX IN packets
       fogIntensity = map(fogIntensity,0,255,0,100); //converts fog intensity in percent
       tOn = constrain(DMXdata[DMXstartAddress+1],0,255);
       tOff = constrain(DMXdata[DMXstartAddress+2],0,255);
+      //Special channels settings for trigerring Cool down mode
+      isCoolingDown = (DMXdata[DMXstartAddress] == 0 && DMXdata[DMXstartAddress+1] == 0 && DMXdata[DMXstartAddress+2] == 255) ? true: false;
+
+      fanRelay = (DMXdata[DMXstartAddress+3] > 127) ? true: false;
     }
 
     uint8_t PWMvalue = map(fogIntensity, 0, 100, VOUT_START, VOUT_END);
@@ -306,19 +315,30 @@ void TaskPWM(void *pvParameters){ // Take care of DMX IN packets
       fogOffTimer = millis();
     }
     
-    if(PWMactivated){
-      ledcWrite(PWM_OUT, PWMvalue);
+    if (isCoolingDown){
+      PWMvalue = 0;
+    }
+    else if(PWMactivated || forceFullFog){
+      if(forceFullFog){
+        PWMvalue = VOUT_END;
+      }
+      else if(fogIntensity == 0){
+        PWMvalue = VOUT_IDLE;
+      }
     }
     else{
-      ledcWrite(PWM_OUT, VOUT_IDLE);
+      PWMvalue = VOUT_IDLE;
     }
 
+    ledcWrite(PWM_OUT, PWMvalue);
+
     PWMactivatedMemo = PWMactivated;
+
+    digitalWrite(FAN_RELAY_PIN,fanRelay);
+
 #ifdef DEBUG
-      // Serial.print("PWM Value: ");
-      // Serial.print(PWMvalue);
-      // Serial.print(" - Activated: ");
-      // Serial.println(PWMactivated);
+      Serial.print("PWM Value: ");
+      Serial.println(PWMvalue);
 #endif
     
 #ifdef DEBUG
@@ -421,14 +441,25 @@ void TaskDisplay(void *pvParameters){ // Take care of DMX IN packets
     }
 
     //Common display
-    display.setCursor(0, 0);
-    
-    if(!dmxIsConnected && fogIntensity == 0 && menuSelected == 0){
+    // Left side of display
+    if(isCoolingDown){
       display.setTextSize(2);
-      display.setCursor(15, 5);
-      display.println("OFF");
+      display.setCursor(0, 5);
+      display.println("COOLING");
+    }
+    else if(forceFullFog){
+      display.setTextSize(2);
+      display.setCursor(0, 5);
+      display.println("PSHHH!");
+    }
+    else if(!dmxIsConnected && fogIntensity == 0 && menuSelected == 0){
+      display.setTextSize(2);
+      display.setCursor(12, 5);
+      display.println("IDLE");
     }
     else{
+      display.setTextSize(0);
+      display.setCursor(0, 0);
       display.print("FOG : ");
       display.print(fogIntensity);
       display.println("%");
@@ -439,7 +470,8 @@ void TaskDisplay(void *pvParameters){ // Take care of DMX IN packets
       display.print(tOff);
       display.println("s");
     }
-    
+
+    //Right side of display
     display.setCursor(102, 0);
     display.setTextSize(0);
     display.print("CH");
@@ -582,40 +614,74 @@ unsigned long now = millis();
         preferences.end();
       }
     }
-
+    //Handle buttons actions behaviours
     switch(menuSelected){
-      case 1:
+      case 0: //No menu selected
+        forceFullFog = (!dmxIsConnected && menuSelected == 0 && btnPlus && foggerReady) ? true : false;
+      break;
+      case 1: //Fog intensity (only if no DMX)
         if(btnMinusShortPress && fogIntensity>0){fogIntensity--;}
         if(btnPlusShortPress && fogIntensity<100){fogIntensity++;}
       break;
-      case 2:
+      case 2: //Fog ON timer (only if no DMX)
         if(btnMinusShortPress && tOn>0){tOn--;}
         if(btnPlusShortPress && tOn<255){tOn++;}
       break;
-      case 3:
+      case 3: //Fog OFF timer (only if no DMX)
         if(btnMinusShortPress && tOff>0){tOff--;}
         if(btnPlusShortPress && tOff<255){tOff++;}
       break;
-      case 4:
-        if(btnMinusShortPress && DMXstartAddress>1){DMXstartAddress--;}
-        if(btnPlusShortPress && DMXstartAddress<510){DMXstartAddress++;}
+      case 4: //DMX address
+        if(btnMinusShortPress && DMXstartAddress>1){
+          DMXstartAddress--;
+#ifdef DEBUG
+          Serial.print("New DMX start ch : ");
+          Serial.println(DMXstartAddress);
+#endif  
+        }
+        if(btnPlusShortPress && DMXstartAddress<509){DMXstartAddress++;
+#ifdef DEBUG
+          Serial.print("New DMX start ch : ");
+          Serial.println(DMXstartAddress);
+#endif
+        }
       break;
       default:
       break;
     }
-    if(btnEnterShortPress){
-      if(!dmxIsConnected){
+    if(btnEnterShortPress){ //scroll parameter to change
+      if(!dmxIsConnected && menuSelected>0){
         menuSelected++;
         if(menuSelected == 5){menuSelected=1;}
       }
     }
-    
+    //If in menu for too long without activity, quit automatically
+    if(menuSelected>0){
+      if(btnMinusShortPress || btnPlusShortPress || btnEnterShortPress || btnEnterLongPress){
+        inMenuTimer = millis();
+      }
+    }
+    else{
+      inMenuTimer = millis();
+    }
+
+    if((millis() - inMenuTimer)>TIMEOUT_MENU){
+      menuSelected = 0;
+    }
+
     btnEnterLongPress = btnEnterShortPress = btnMinusShortPress = btnPlusShortPress = false;
 
     //Fogger statuts inputs reading
     foggerHeating = !digitalRead(FOGGER_HEATING);
     foggerReady = !digitalRead(FOGGER_READY);
-    
+#ifdef DEBUG
+    //Serial.print("Heating: ");
+    //Serial.print(foggerHeating);
+    //Serial.print(" Ready: ");
+    //Serial.println(foggerReady);
+#endif
+
+
     vTaskDelay(10);
 #ifdef DEBUG
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
