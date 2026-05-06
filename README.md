@@ -1,4 +1,5 @@
 
+
 # Martin Magnum 850/1200 DMX controller
 DMX and artnet controller for fog machine Martin Magnum 850/1200
 
@@ -49,6 +50,19 @@ The controller board has been designed under EasyEDA : https://oshwlab.com/pimou
 
 Stable version from V1.2.
 
+All the other parts :
+
+|Part | Link (for example) | 
+|--|--|
+| Push buttons (x5) | https://fr.aliexpress.com/item/1005008558481882.html |
+| XLR Female panel mount | https://fr.aliexpress.com/item/1005007432049215.html |
+| XLR Male panel mount  | https://fr.aliexpress.com/item/1005007432049215.html |
+| OLED display | https://fr.aliexpress.com/item/1005008640108394.html |
+| FAN option connector | https://www.amazon.fr/WeiChat-Connecteur-industriel-Branchement-a%C3%A9ronautique/dp/B0D5XYQ4D8?source=ps-sl-shoppingads-lpcontext&utm_source=chatgpt.com&th=1&language=en_GB |
+| Dupont connectors female (3x 3pins, 1x 4pins) | Any electronic website |
+| JST-PH with wires female (3x 2pins) | Any electronic website |
+
+
 ## Enclosure
 You may find a 3D enclosure for the board and connectors on Makerworld `(TODO : add )`
 The shape and fixing holes positions have been designed according to the Martin Magnum 850 to be fixed at the back of the machine.
@@ -95,4 +109,3 @@ You will need to tweak some values in `parameters.h` file of the firmware accord
     #define  VOUT_START  48 //2Vout
     #define  VOUT_END  243 //10Vout
 With a multimeter, probe the fog signal that goes into the fog machine (the signal can be probed on the OUT RJ45 connector on the machine) and change the parameters above to match the corresponding voltages.
-
