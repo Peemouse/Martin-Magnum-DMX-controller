@@ -2,7 +2,7 @@
 #ifndef HW_h
 #define HW_h
 
-#define HW_VERSION      11
+#define HW_VERSION      13
 
 // Define PWM pins
 #define PWM_OUT         13
@@ -27,8 +27,8 @@
 #define ETH_PHY_TYPE    ETH_PHY_W5500
 #define ETH_PHY_ADDR    1
 #define ETH_PHY_CS      5
-#define ETH_PHY_IRQ     4
-#define ETH_PHY_RST     5
+#define ETH_PHY_IRQ     -1
+#define ETH_PHY_RST     -1
 
 //Switch panel
 
